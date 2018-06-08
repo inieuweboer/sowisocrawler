@@ -1,18 +1,25 @@
-from scrapy.contrib.spiders.init import InitSpider
+# Version 2.0, for scrapy 1.5.0
+
+from scrapy.spiders.init import InitSpider
 from scrapy.http import Request
 from scrapy.shell import inspect_response
 
 from selenium import webdriver
-import time
 
-import os
+import logging, time, os, sys, re, unicodedata
 
-import logging
-
-import os
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from login import username, password  # two variables used in get_cookies()
+
+
+def slugify(value):
+    # Normalizes string, converts to lowercase, removes non-alpha characters,
+    # and converts spaces to hyphens.
+    value = unicodedata.normalize('NFKD', value) \
+            .encode('ascii', 'ignore').decode('utf-8')
+    value = re.sub('[^\w\s-]', '', value).strip().lower()
+    value = re.sub('[-\s]+', '-', value)
+    return value
 
 
 class SowisoSpider(InitSpider):
@@ -21,14 +28,15 @@ class SowisoSpider(InitSpider):
 
     login_page = 'https://uva.sowiso.nl'
     # teacher_page = 'https://uva.sowiso.nl/profile/'
-    start_urls = ['https://uva.sowiso.nl/teacher/review_test/83/802',
-                  'https://uva.sowiso.nl/teacher/review_test/83/803']
+    start_urls = ['https://uva.sowiso.nl/teacher/review_test/131/1092',
+                  'https://uva.sowiso.nl/teacher/review_test/131/1091']
 
-    save_dir = '/home/ismani94/Documents/studie/InlProg2017/' \
-               'testarea_downloading/sowiso_download'
+    save_dir = '/home/inieuweboer/Desktop/InlProg2018/download'
 
+    from datetime import datetime
+    log_file = str(datetime.utcnow().strftime('%m_%d_%Y_%I_%M_%S')) + '.log'
     logging.basicConfig(
-        filename='log.txt',
+        filename=log_file,
         format='%(levelname)s: %(message)s',
         level=logging.INFO
     )
@@ -64,7 +72,7 @@ class SowisoSpider(InitSpider):
     def check_login(self, response):
         """Check if we are successfully logged in."""
         # if "SOWISO B.V." in response.body:
-        if "log uit" in response.body:
+        if "log uit" in response.text:
             logging.info("Successfully logged in")
 
             # Now the crawling can begin..
@@ -94,10 +102,11 @@ class SowisoSpider(InitSpider):
     # Parse the name and zip file url on the page
     def parse_solution_page(self, response):
         assignment = response.meta.get('assignment')
-        student_name = response.xpath(
-                '//small/text()').extract_first().replace(' ', '_').lower()
+        student_name = slugify(
+                response.xpath('//small/text()').extract_first())
         url = self.login_page + response.xpath(
-                '//a[contains(@href, "files")]/@href').extract_first()
+                #'//a[contains(@href, "files")]/@href').extract_first()
+                '//a[contains(@href, "files")]/@href').extract()[1]
         logging.info("about to parse solution of %s by %s with url %s",
                      assignment, student_name, url)
 
@@ -111,11 +120,11 @@ class SowisoSpider(InitSpider):
 
     # Parse the long list in which you cannot download all (sigh)
     def parse(self, response):
-        page_name = response.xpath(
-                '//h3/text()').extract_first().replace(' ', '_').lower()
+        # inspect_response(response, self)
+
+        page_name = slugify(response.xpath('//h3/text()').extract_first())
         logging.info("starting to parse solutions of %s with url %s",
                      page_name, response.url)
-        # inspect_response(response, self)
         for numobj in response.xpath('//td[contains(@id, "test_id")]/@id'):
             num = numobj.extract()[-6:]
             url = self.login_page + '/teacher/grade_test/' + num
