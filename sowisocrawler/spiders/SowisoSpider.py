@@ -7,6 +7,7 @@ from scrapy.shell import inspect_response
 from selenium import webdriver
 
 import logging, time, os, sys, re, unicodedata
+from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from login import username, password  # two variables used in get_cookies()
@@ -19,6 +20,7 @@ def slugify(value):
             .encode('ascii', 'ignore').decode('utf-8')
     value = re.sub('[^\w\s-]', '', value).strip().lower()
     value = re.sub('[-\s]+', '-', value)
+
     return value
 
 
@@ -33,7 +35,6 @@ class SowisoSpider(InitSpider):
 
     save_dir = '/home/inieuweboer/Desktop/InlProg2018/download'
 
-    from datetime import datetime
     log_file = str(datetime.utcnow().strftime('%m_%d_%Y_%I_%M_%S')) + '.log'
     logging.basicConfig(
         filename=log_file,
@@ -83,11 +84,14 @@ class SowisoSpider(InitSpider):
 
     # Save the zip file with its name in a folder with the students name
     def parse_item(self, response):
+        folder = response.meta.get('student_name')
+
+
+
         # Get names and concat them
         filename = response.url.split("/")[-2] + '_' + \
                     response.url.split("/")[-1]
         assignment = response.meta.get('assignment')
-        folder = response.meta.get('folder')
         folder_path = os.path.join(self.save_dir, assignment, folder)
         file_path = os.path.join(folder_path, filename)
         logging.info("about to save file with url %s to %s",
@@ -113,9 +117,10 @@ class SowisoSpider(InitSpider):
         # meta is to send name through, cannot have kwargs**
         # Check if name is not empty
         if student_name and url:
+            # Calls parse_item
             yield Request(url=url, cookies=self.cookies,
                           callback=self.parse_item,
-                          meta={'folder': student_name,
+                          meta={'student_name': student_name,
                                 'assignment': assignment})
 
     # Parse the long list in which you cannot download all (sigh)
@@ -128,6 +133,8 @@ class SowisoSpider(InitSpider):
         for numobj in response.xpath('//td[contains(@id, "test_id")]/@id'):
             num = numobj.extract()[-6:]
             url = self.login_page + '/teacher/grade_test/' + num
+
+            # Calls parse_solution_page
             yield Request(url=url, cookies=self.cookies,
                           callback=self.parse_solution_page,
                           meta={'assignment': page_name})
