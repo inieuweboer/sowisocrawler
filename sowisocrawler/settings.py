@@ -12,7 +12,7 @@ SPIDER_MODULES = ['sowisocrawler.spiders']
 NEWSPIDER_MODULE = 'sowisocrawler.spiders'
 
 SPIDER_MIDDLEWARES = {
-'scrapy.contrib.spidermiddleware.referer.RefererMiddleware': True,
+'scrapy.spidermiddlewares.referer.RefererMiddleware': True,
 }
 
 COOKIES_ENABLED = True
